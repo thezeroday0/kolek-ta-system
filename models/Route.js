@@ -1,0 +1,18 @@
+const mongoose = require('mongoose');
+
+const routeSchema = new mongoose.Schema({
+  routeId: { type: String, required: true, unique: true },
+  name: String,
+  bins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Bin' }],
+  path: {
+    type: { type: String, enum: ['LineString'], default: 'LineString' },
+    coordinates: [[Number]]
+  },
+  distance: Number,
+  estimatedTime: Number,
+  status: { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
+  assignedVehicle: String,
+  scheduledDate: Date
+}, { timestamps: true });
+
+module.exports = mongoose.model('Route', routeSchema);
