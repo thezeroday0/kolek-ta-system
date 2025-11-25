@@ -1802,6 +1802,37 @@ window.markRouteComplete = async function(routeId) {
     });
     
     // Form submission
+    // Helper function to compress image
+    async function compressImage(file, maxWidth = 800, quality = 0.7) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            canvas.toBlob((blob) => {
+              resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+            }, 'image/jpeg', quality);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    
     document.getElementById('completeRouteForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -1813,11 +1844,22 @@ window.markRouteComplete = async function(routeId) {
         return;
       }
       
+      // Show loading
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Compressing photos...';
+      submitBtn.disabled = true;
+      
       const formData = new FormData();
+      
+      // Compress each photo before adding to formData
       for (let i = 0; i < photos.length; i++) {
-        formData.append('photos', photos[i]);
+        const compressedPhoto = await compressImage(photos[i]);
+        formData.append('photos', compressedPhoto);
       }
       formData.append('notes', notes);
+      
+      submitBtn.textContent = 'Uploading...';
       
       try {
         const token = localStorage.getItem('token');
@@ -1853,9 +1895,13 @@ window.markRouteComplete = async function(routeId) {
             errorMsg = responseText || errorMsg;
           }
           alert('Error: ' + errorMsg);
+          submitBtn.textContent = originalText;
+          submitBtn.disabled = false;
         }
       } catch (error) {
         alert('Error completing route: ' + error.message);
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
       }
     });
   } catch (error) {
