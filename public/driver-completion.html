@@ -305,20 +305,54 @@
       }
     }
 
+    // Compress image to reduce size
+    function compressImage(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Resize to max 800px width/height
+            let width = img.width;
+            let height = img.height;
+            const maxSize = 800;
+            
+            if (width > height && width > maxSize) {
+              height = (height * maxSize) / width;
+              width = maxSize;
+            } else if (height > maxSize) {
+              width = (width * maxSize) / height;
+              height = maxSize;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Compress to 70% quality
+            const compressed = canvas.toDataURL('image/jpeg', 0.7);
+            resolve(compressed);
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     // Handle photo selection
-    document.getElementById('photoInput').addEventListener('change', function(e) {
+    document.getElementById('photoInput').addEventListener('change', async function(e) {
       const files = Array.from(e.target.files);
       
-      files.forEach(file => {
+      for (const file of files) {
         if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = function(event) {
-            selectedPhotos.push(event.target.result);
-            updatePhotoPreview();
-          };
-          reader.readAsDataURL(file);
+          const compressed = await compressImage(file);
+          selectedPhotos.push(compressed);
+          updatePhotoPreview();
         }
-      });
+      }
     });
 
     function updatePhotoPreview() {
