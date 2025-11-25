@@ -16,14 +16,33 @@ app.use(express.static('public'));
 // Check if using mock authentication
 const useMockAuth = process.env.USE_MOCK_AUTH === 'true';
 
-// MongoDB Connection
+// MongoDB Connection with Vercel-optimized settings
 if (!useMockAuth) {
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/kolekta')
-    .then(() => console.log('✅ Connected to MongoDB'))
+  const mongoOptions = {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    family: 4 // Use IPv4, skip trying IPv6
+  };
+  
+  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/kolekta', mongoOptions)
+    .then(() => {
+      console.log('✅ Connected to MongoDB');
+      console.log('📊 Database:', mongoose.connection.name);
+    })
     .catch(err => {
       console.error('❌ MongoDB connection error:', err.message);
       console.log('💡 Tip: Set USE_MOCK_AUTH=true in .env to use mock authentication');
+      console.log('🔍 Connection string:', process.env.MONGODB_URI ? 'Found' : 'Missing');
     });
+  
+  // Handle connection events
+  mongoose.connection.on('error', err => {
+    console.error('MongoDB connection error:', err);
+  });
+  
+  mongoose.connection.on('disconnected', () => {
+    console.log('MongoDB disconnected');
+  });
 } else {
   console.log('📝 Mock authentication enabled - no database needed');
   // Initialize persistent storage
