@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { authenticateToken } = require('../middleware/auth');
-const { usersStorage } = require('../data/storage');
+const User = require('../models/User');
 
 // Configure multer for profile picture upload
 const storage = multer.diskStorage({
@@ -41,7 +41,7 @@ const upload = multer({
 // Get current user profile
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const user = usersStorage.findByUsername(req.user.username);
+    const user = await User.findOne({ username: req.user.username });
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -68,25 +68,28 @@ router.put('/me', authenticateToken, async (req, res) => {
     const { fullName, email, phoneNumber, password } = req.body;
     const username = req.user.username;
     
-    const updates = {};
-    if (fullName) updates.fullName = fullName;
-    if (email) updates.email = email;
-    if (phoneNumber) updates.phoneNumber = phoneNumber;
-    if (password) updates.password = password; // Add password support
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     
-    usersStorage.update(username, updates);
-    const updatedUser = usersStorage.findByUsername(username);
+    if (fullName) user.fullName = fullName;
+    if (email) user.email = email;
+    if (phoneNumber) user.phoneNumber = phoneNumber;
+    if (password) user.password = password;
+    
+    await user.save();
     
     res.json({
       message: 'Profile updated successfully',
       user: {
-        _id: updatedUser._id,
-        username: updatedUser.username,
-        email: updatedUser.email,
-        role: updatedUser.role,
-        fullName: updatedUser.fullName,
-        phoneNumber: updatedUser.phoneNumber,
-        profilePicture: updatedUser.profilePicture
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        fullName: user.fullName,
+        phoneNumber: user.phoneNumber,
+        profilePicture: user.profilePicture
       }
     });
   } catch (error) {
@@ -102,7 +105,11 @@ router.post('/picture', authenticateToken, upload.single('profilePicture'), asyn
     }
     
     const username = req.user.username;
-    const user = usersStorage.findByUsername(username);
+    const user = await User.findOne({ username });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     
     // Delete old profile picture if exists
     if (user.profilePicture) {
@@ -114,7 +121,8 @@ router.post('/picture', authenticateToken, upload.single('profilePicture'), asyn
     
     // Update user with new profile picture path
     const profilePicturePath = `/uploads/profiles/${req.file.filename}`;
-    usersStorage.update(username, { profilePicture: profilePicturePath });
+    user.profilePicture = profilePicturePath;
+    await user.save();
     
     res.json({
       message: 'Profile picture updated successfully',
@@ -129,7 +137,11 @@ router.post('/picture', authenticateToken, upload.single('profilePicture'), asyn
 router.delete('/picture', authenticateToken, async (req, res) => {
   try {
     const username = req.user.username;
-    const user = usersStorage.findByUsername(username);
+    const user = await User.findOne({ username });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     
     if (user.profilePicture) {
       const filePath = path.join(__dirname, '../public', user.profilePicture);
@@ -137,7 +149,8 @@ router.delete('/picture', authenticateToken, async (req, res) => {
         fs.unlinkSync(filePath);
       }
       
-      usersStorage.update(username, { profilePicture: null });
+      user.profilePicture = null;
+      await user.save();
     }
     
     res.json({ message: 'Profile picture removed' });
