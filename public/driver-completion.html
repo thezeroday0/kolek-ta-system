@@ -353,6 +353,9 @@
         const token = localStorage.getItem('token');
         const notes = document.getElementById('notes').value;
 
+        console.log('Submitting completion for route:', routeId);
+        console.log('Photos count:', selectedPhotos.length);
+
         const response = await fetch(`${API_URL}/route-completion/${routeId}/complete`, {
           method: 'POST',
           headers: {
@@ -365,15 +368,27 @@
           })
         });
 
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+
+        // Check if response has content
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Server returned invalid response. Please try again.');
+        }
+
+        const result = await response.json();
+        console.log('Response data:', result);
+
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to submit completion');
+          throw new Error(result.error || 'Failed to submit completion');
         }
 
         showMessage('success', '✅ Route marked as complete! Redirecting...');
         setTimeout(() => window.location.href = '/mobile', 2000);
       } catch (error) {
-        showMessage('error', error.message);
+        console.error('Error completing route:', error);
+        showMessage('error', error.message || 'Failed to submit. Please try again.');
         submitBtn.disabled = false;
         submitBtn.textContent = '✅ Mark as Complete';
       }
