@@ -11,6 +11,7 @@ const routeSchema = new mongoose.Schema({
   distance: Number,
   estimatedTime: Number,
   status: { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
+  assignedDriver: String,
   assignedVehicle: String,
   scheduledDate: Date
 }, { timestamps: true });

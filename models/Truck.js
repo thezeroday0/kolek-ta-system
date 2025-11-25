@@ -10,12 +10,17 @@ const truckSchema = new mongoose.Schema({
     enum: ['available', 'in-use', 'maintenance', 'out-of-service'], 
     default: 'available' 
   },
-  assignedDriver: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  assignedDriver: String, // Username of the driver (not ObjectId)
   lastMaintenance: Date,
   nextMaintenance: Date,
   fuelLevel: { type: Number, default: 100 }, // percentage
   mileage: { type: Number, default: 0 }, // in km
   notes: String
 }, { timestamps: true });
+
+// Clear any existing model to avoid schema caching issues
+if (mongoose.models.Truck) {
+  delete mongoose.models.Truck;
+}
 
 module.exports = mongoose.model('Truck', truckSchema);

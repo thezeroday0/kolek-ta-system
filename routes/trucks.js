@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
-const { trucksStorage } = require('../data/storage');
+const Truck = require('../models/Truck');
 
 // Mock trucks storage (for reference only - now using persistent storage)
 const defaultTrucks = [
@@ -38,7 +38,7 @@ const defaultTrucks = [
 // Get all trucks
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const trucks = trucksStorage.getAll();
+    const trucks = await Truck.find({});
     res.json(trucks);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -48,7 +48,7 @@ router.get('/', authenticateToken, async (req, res) => {
 // Get single truck
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const truck = trucksStorage.findById(req.params.id);
+    const truck = await Truck.findById(req.params.id);
     if (!truck) {
       return res.status(404).json({ error: 'Truck not found' });
     }
@@ -62,20 +62,20 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
     const { truckId, plateNumber, model, capacity, notes } = req.body;
-    const allTrucks = trucksStorage.getAll();
     
     // Check if truckId exists
-    if (allTrucks.find(t => t.truckId === truckId)) {
+    const existingTruckId = await Truck.findOne({ truckId });
+    if (existingTruckId) {
       return res.status(400).json({ error: 'Truck ID already exists' });
     }
     
     // Check if plate number exists
-    if (allTrucks.find(t => t.plateNumber === plateNumber)) {
+    const existingPlate = await Truck.findOne({ plateNumber: plateNumber.toUpperCase() });
+    if (existingPlate) {
       return res.status(400).json({ error: 'Plate number already exists' });
     }
     
-    const newTruck = {
-      _id: String(Date.now()),
+    const newTruck = await Truck.create({
       truckId,
       plateNumber: plateNumber.toUpperCase(),
       model: model || '',
@@ -87,9 +87,8 @@ router.post('/', authenticateToken, authorizeRole('admin'), async (req, res) => 
       fuelLevel: 100,
       mileage: 0,
       notes: notes || ''
-    };
+    });
     
-    trucksStorage.add(newTruck);
     res.status(201).json(newTruck);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -99,34 +98,37 @@ router.post('/', authenticateToken, authorizeRole('admin'), async (req, res) => 
 // Update truck (Admin only)
 router.put('/:id', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
-    const truck = trucksStorage.findById(req.params.id);
+    const truck = await Truck.findById(req.params.id);
     if (!truck) {
       return res.status(404).json({ error: 'Truck not found' });
     }
     
     const { plateNumber, model, capacity, status, assignedDriver, lastMaintenance, nextMaintenance, fuelLevel, mileage, notes } = req.body;
-    const allTrucks = trucksStorage.getAll();
     
     // Check if plate number is taken by another truck
-    if (plateNumber && allTrucks.find(t => t.plateNumber === plateNumber.toUpperCase() && t._id !== truck._id)) {
-      return res.status(400).json({ error: 'Plate number already exists' });
+    if (plateNumber) {
+      const existingPlate = await Truck.findOne({ 
+        plateNumber: plateNumber.toUpperCase(), 
+        _id: { $ne: truck._id } 
+      });
+      if (existingPlate) {
+        return res.status(400).json({ error: 'Plate number already exists' });
+      }
+      truck.plateNumber = plateNumber.toUpperCase();
     }
     
-    const updates = {};
-    if (plateNumber) updates.plateNumber = plateNumber.toUpperCase();
-    if (model !== undefined) updates.model = model;
-    if (capacity !== undefined) updates.capacity = capacity;
-    if (status) updates.status = status;
-    if (assignedDriver !== undefined) updates.assignedDriver = assignedDriver;
-    if (lastMaintenance !== undefined) updates.lastMaintenance = lastMaintenance;
-    if (nextMaintenance !== undefined) updates.nextMaintenance = nextMaintenance;
-    if (fuelLevel !== undefined) updates.fuelLevel = fuelLevel;
-    if (mileage !== undefined) updates.mileage = mileage;
-    if (notes !== undefined) updates.notes = notes;
+    if (model !== undefined) truck.model = model;
+    if (capacity !== undefined) truck.capacity = capacity;
+    if (status) truck.status = status;
+    if (assignedDriver !== undefined) truck.assignedDriver = assignedDriver;
+    if (lastMaintenance !== undefined) truck.lastMaintenance = lastMaintenance;
+    if (nextMaintenance !== undefined) truck.nextMaintenance = nextMaintenance;
+    if (fuelLevel !== undefined) truck.fuelLevel = fuelLevel;
+    if (mileage !== undefined) truck.mileage = mileage;
+    if (notes !== undefined) truck.notes = notes;
     
-    trucksStorage.update(truck._id, updates);
-    const updatedTruck = trucksStorage.findById(truck._id);
-    res.json(updatedTruck);
+    await truck.save();
+    res.json(truck);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -135,17 +137,12 @@ router.put('/:id', authenticateToken, authorizeRole('admin'), async (req, res) =
 // Delete truck (Admin only)
 router.delete('/:id', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
-    const truck = trucksStorage.findById(req.params.id);
+    const truck = await Truck.findById(req.params.id);
     if (!truck) {
       return res.status(404).json({ error: 'Truck not found' });
     }
     
-    // Check if truck is in use
-    if (truck.status === 'in-use') {
-      return res.status(400).json({ error: 'Cannot delete truck that is currently in use' });
-    }
-    
-    trucksStorage.delete(truck._id);
+    await Truck.deleteOne({ _id: truck._id });
     res.json({ message: 'Truck deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -155,11 +152,31 @@ router.delete('/:id', authenticateToken, authorizeRole('admin'), async (req, res
 // Get available trucks
 router.get('/status/available', authenticateToken, async (req, res) => {
   try {
-    const allTrucks = trucksStorage.getAll();
-    const available = allTrucks.filter(t => t.status === 'available');
+    const available = await Truck.find({ status: 'available' });
     res.json(available);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Assign driver to truck (Admin only)
+router.post('/:id/assign', authenticateToken, authorizeRole('admin'), async (req, res) => {
+  try {
+    const { driverId } = req.body;
+    
+    const truck = await Truck.findById(req.params.id);
+    if (!truck) {
+      return res.status(404).json({ error: 'Truck not found' });
+    }
+    
+    // Update truck assignment
+    truck.assignedDriver = driverId || null;
+    truck.status = driverId ? 'in-use' : 'available';
+    await truck.save();
+    
+    res.json(truck);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 

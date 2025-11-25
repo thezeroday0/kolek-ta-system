@@ -1459,14 +1459,14 @@ window.assignRouteToDriver = async function(routeId) {
       
       try {
         const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/routes/${routeId}`, {
+        const response = await fetch(`${API_URL}/routes/${routeId}/assign`, {
           method: 'PUT',
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
-            assignedDriver: selectedDriver,
+            driverId: selectedDriver,
             status: status
           })
         });

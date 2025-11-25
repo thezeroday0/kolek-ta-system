@@ -2,21 +2,12 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
-const { usersStorage } = require('../data/storage');
+const User = require('../models/User');
 
 // Get all users (Admin only)
 router.get('/', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
-    const allUsers = usersStorage.getAll();
-    const users = allUsers.map(u => ({
-      _id: u._id,
-      username: u.username,
-      email: u.email,
-      role: u.role,
-      fullName: u.fullName,
-      phoneNumber: u.phoneNumber,
-      isActive: u.isActive
-    }));
+    const users = await User.find({}, '-password');
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -26,21 +17,15 @@ router.get('/', authenticateToken, authorizeRole('admin'), async (req, res) => {
 // Get single user (Admin only)
 router.get('/:id', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
-    const allUsers = usersStorage.getAll();
-    const user = allUsers.find(u => u._id === req.params.id || u.username === req.params.id);
+    const user = await User.findOne({
+      $or: [{ _id: req.params.id }, { username: req.params.id }]
+    }, '-password');
+    
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      fullName: user.fullName,
-      phoneNumber: user.phoneNumber,
-      isActive: user.isActive
-    });
+    res.json(user);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -50,7 +35,6 @@ router.get('/:id', authenticateToken, authorizeRole('admin'), async (req, res) =
 router.post('/', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
     const { username, email, password, role, fullName, phoneNumber } = req.body;
-    const allUsers = usersStorage.getAll();
     
     // Only allow creating drivers
     if (role && role !== 'driver') {
@@ -58,12 +42,14 @@ router.post('/', authenticateToken, authorizeRole('admin'), async (req, res) => 
     }
     
     // Check if username exists
-    if (allUsers.find(u => u.username === username)) {
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
       return res.status(400).json({ error: 'Username already exists' });
     }
     
     // Check if email exists
-    if (allUsers.find(u => u.email === email)) {
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
       return res.status(400).json({ error: 'Email already exists' });
     }
     
@@ -72,21 +58,15 @@ router.post('/', authenticateToken, authorizeRole('admin'), async (req, res) => 
       return res.status(400).json({ error: 'Full name and phone number are required' });
     }
     
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    const newUser = {
-      _id: String(Date.now()),
+    const newUser = await User.create({
       username,
       email,
-      password: hashedPassword,
-      role: 'driver', // Always driver
+      password,
+      role: 'driver',
       fullName,
       phoneNumber,
       isActive: true
-    };
-    
-    usersStorage.add(newUser);
+    });
     
     res.status(201).json({
       _id: newUser._id,
@@ -105,51 +85,54 @@ router.post('/', authenticateToken, authorizeRole('admin'), async (req, res) => 
 // Update user (Admin only)
 router.put('/:id', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
-    const allUsers = usersStorage.getAll();
-    const userIndex = allUsers.findIndex(u => u._id === req.params.id || u.username === req.params.id);
-    if (userIndex === -1) {
+    const user = await User.findOne({
+      $or: [{ _id: req.params.id }, { username: req.params.id }]
+    });
+    
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
     const { email, password, role, fullName, phoneNumber, isActive } = req.body;
     
     // Prevent changing admin role
-    if (allUsers[userIndex].role === 'admin' && role && role !== 'admin') {
+    if (user.role === 'admin' && role && role !== 'admin') {
       return res.status(400).json({ error: 'Cannot change admin role' });
     }
     
     // Prevent changing driver to admin
-    if (role && role === 'admin' && allUsers[userIndex].role !== 'admin') {
+    if (role && role === 'admin' && user.role !== 'admin') {
       return res.status(400).json({ error: 'Cannot promote user to admin' });
     }
     
     // Check if email is taken by another user
-    if (email && allUsers.find((u, i) => u.email === email && i !== userIndex)) {
-      return res.status(400).json({ error: 'Email already exists' });
+    if (email) {
+      const existingEmail = await User.findOne({ email, _id: { $ne: user._id } });
+      if (existingEmail) {
+        return res.status(400).json({ error: 'Email already exists' });
+      }
+      user.email = email;
     }
     
-    const updates = {};
-    if (email) updates.email = email;
-    if (password) updates.password = await bcrypt.hash(password, 10);
-    if (fullName !== undefined) updates.fullName = fullName;
-    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
+    if (password) user.password = password;
+    if (fullName !== undefined) user.fullName = fullName;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
     
     // Only allow changing active status for drivers
-    if (isActive !== undefined && allUsers[userIndex].role !== 'admin') {
-      updates.isActive = isActive;
+    if (isActive !== undefined && user.role !== 'admin') {
+      user.isActive = isActive;
     }
     
-    usersStorage.update(allUsers[userIndex].username, updates);
-    const updatedUser = usersStorage.findByUsername(allUsers[userIndex].username);
+    await user.save();
     
     res.json({
-      _id: updatedUser._id,
-      username: updatedUser.username,
-      email: updatedUser.email,
-      role: updatedUser.role,
-      fullName: updatedUser.fullName,
-      phoneNumber: updatedUser.phoneNumber,
-      isActive: updatedUser.isActive
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
+      isActive: user.isActive
     });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -159,8 +142,10 @@ router.put('/:id', authenticateToken, authorizeRole('admin'), async (req, res) =
 // Delete user (Admin only)
 router.delete('/:id', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
-    const allUsers = usersStorage.getAll();
-    const user = allUsers.find(u => u._id === req.params.id || u.username === req.params.id);
+    const user = await User.findOne({
+      $or: [{ _id: req.params.id }, { username: req.params.id }]
+    });
+    
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -175,7 +160,7 @@ router.delete('/:id', authenticateToken, authorizeRole('admin'), async (req, res
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
     
-    usersStorage.delete(user.username);
+    await User.deleteOne({ _id: user._id });
     res.json({ message: 'Driver deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Route = require('../models/Route');
 const Bin = require('../models/Bin');
+const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
 // Get all routes
 router.get('/', async (req, res) => {
@@ -32,6 +33,26 @@ router.post('/', async (req, res) => {
     const route = new Route(req.body);
     await route.save();
     res.status(201).json(route);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Assign route to driver
+router.put('/:id/assign', authenticateToken, authorizeRole('admin'), async (req, res) => {
+  try {
+    const { driverId, status } = req.body;
+    const route = await Route.findById(req.params.id);
+    
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+    
+    route.assignedDriver = driverId;
+    if (status) route.status = status;
+    
+    await route.save();
+    res.json(route);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
