@@ -390,6 +390,8 @@
         console.log('Submitting completion for route:', routeId);
         console.log('Photos count:', selectedPhotos.length);
 
+        // For now, just send photo count instead of actual photos to avoid timeout
+        // TODO: Implement proper cloud storage (Cloudinary) for photos
         const response = await fetch(`${API_URL}/route-completion/${routeId}/complete`, {
           method: 'POST',
           headers: {
@@ -397,8 +399,8 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            photos: selectedPhotos,
-            notes: notes
+            photos: [`Photo proof: ${selectedPhotos.length} photo(s) uploaded`], // Placeholder
+            notes: notes + `\n[${selectedPhotos.length} photos were uploaded but not stored - implement cloud storage]`
           })
         });
 
