@@ -1829,14 +1829,30 @@ window.markRouteComplete = async function(routeId) {
           body: formData
         });
         
+        // Get response text first to handle empty responses
+        const responseText = await response.text();
+        
         if (response.ok) {
-          const result = await response.json();
+          let result;
+          try {
+            result = responseText ? JSON.parse(responseText) : { message: 'Success' };
+          } catch (e) {
+            result = { message: 'Route completed' };
+          }
           alert('✓ Route marked as complete! Admin has been notified.');
           closeModal();
           loadDriverAssignments();
         } else {
-          const error = await response.json();
-          alert('Error: ' + (error.error || 'Failed to complete route'));
+          let errorMsg = 'Failed to complete route';
+          try {
+            if (responseText) {
+              const error = JSON.parse(responseText);
+              errorMsg = error.error || error.message || errorMsg;
+            }
+          } catch (e) {
+            errorMsg = responseText || errorMsg;
+          }
+          alert('Error: ' + errorMsg);
         }
       } catch (error) {
         alert('Error completing route: ' + error.message);

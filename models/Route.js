@@ -10,14 +10,16 @@ const routeSchema = new mongoose.Schema({
   },
   distance: Number,
   estimatedTime: Number,
-  status: { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
+  status: { type: String, enum: ['planned', 'active', 'completed', 'pending'], default: 'planned' },
   assignedDriver: String,
   assignedVehicle: String,
   scheduledDate: Date,
   // Completion data
-  completionPhotos: [String], // Proof photos
+  completionPhotos: [String], // Proof photos (base64 or URLs)
   completedAt: Date,
-  completionNotes: String
+  completedBy: String,
+  completionNotes: String,
+  notificationSent: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Route', routeSchema);
