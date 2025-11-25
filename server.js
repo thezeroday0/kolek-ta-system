@@ -65,6 +65,7 @@ app.use('/api/bins', require('./routes/bins'));
 app.use('/api/completions', require('./routes/completions'));
 app.use('/api/tracking', require('./routes/tracking'));
 app.use('/api/profile', require('./routes/profile'));
+app.use('/api/route-completion', require('./routes/route-completion'));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));

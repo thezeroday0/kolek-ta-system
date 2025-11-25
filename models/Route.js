@@ -13,7 +13,11 @@ const routeSchema = new mongoose.Schema({
   status: { type: String, enum: ['planned', 'active', 'completed'], default: 'planned' },
   assignedDriver: String,
   assignedVehicle: String,
-  scheduledDate: Date
+  scheduledDate: Date,
+  // Completion data
+  completionPhotos: [String], // Proof photos
+  completedAt: Date,
+  completionNotes: String
 }, { timestamps: true });
 
 module.exports = mongoose.model('Route', routeSchema);
