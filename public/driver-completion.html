@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete Route - Kolek-Ta</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+      color: #2e7d32;
+      margin-bottom: 0.5rem;
+      font-size: 1.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+
+    .route-info {
+      background: #f5f5f5;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      border-left: 4px solid #4caf50;
+    }
+
+    .route-info h3 {
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .route-info p {
+      color: #666;
+      font-size: 0.9rem;
+      margin: 0.25rem 0;
+    }
+
+    .photo-section {
+      margin-bottom: 2rem;
+    }
+
+    .photo-section h3 {
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 1.1rem;
+    }
+
+    .photo-input {
+      display: none;
+    }
+
+    .photo-button {
+      display: block;
+      width: 100%;
+      padding: 1rem;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 1rem;
+      transition: all 0.2s;
+    }
+
+    .photo-button:active {
+      transform: scale(0.98);
+      background: #45a049;
+    }
+
+    .photo-preview {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .photo-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid #e0e0e0;
+    }
+
+    .photo-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-item .remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(244, 67, 54, 0.9);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .notes-section {
+      margin-bottom: 2rem;
+    }
+
+    .notes-section h3 {
+      color: #333;
+      margin-bottom: 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #4caf50;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 1rem;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .submit-btn:not(:disabled):active {
+      transform: scale(0.98);
+      background: #45a049;
+    }
+
+    .back-btn {
+      display: inline-block;
+      margin-bottom: 1rem;
+      color: white;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+
+    .message {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <a href="/mobile" class="back-btn">← Back to Dashboard</a>
+  
+  <div class="container">
+    <h1>📸 Complete Route</h1>
+    <p class="subtitle">Upload photos as proof of completion</p>
+
+    <div id="message" class="message"></div>
+    <div id="loading" class="loading" style="display:none;">Loading route details...</div>
+
+    <div id="routeContent" style="display:none;">
+      <div class="route-info" id="routeInfo">
+        <!-- Route details will be loaded here -->
+      </div>
+
+      <div class="photo-section">
+        <h3>📷 Completion Photos (Required)</h3>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">
+          Take photos showing the completed collection work
+        </p>
+        
+        <input type="file" id="photoInput" class="photo-input" accept="image/*" capture="environment" multiple>
+        <button class="photo-button" onclick="document.getElementById('photoInput').click()">
+          📸 Take/Upload Photos
+        </button>
+
+        <div id="photoPreview" class="photo-preview"></div>
+      </div>
+
+      <div class="notes-section">
+        <h3>📝 Notes (Optional)</h3>
+        <textarea id="notes" placeholder="Add any notes about the collection..."></textarea>
+      </div>
+
+      <button id="submitBtn" class="submit-btn" onclick="submitCompletion()">
+        ✅ Mark as Complete
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = window.location.origin + '/api';
+    let selectedPhotos = [];
+    let currentRoute = null;
+
+    // Get route ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const routeId = urlParams.get('routeId');
+
+    if (!routeId) {
+      showMessage('error', 'No route ID provided');
+      setTimeout(() => window.location.href = '/mobile', 2000);
+    }
+
+    // Load route details
+    async function loadRouteDetails() {
+      const loading = document.getElementById('loading');
+      const content = document.getElementById('routeContent');
+      
+      loading.style.display = 'block';
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/routes`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error('Failed to load routes');
+
+        const routes = await response.json();
+        currentRoute = routes.find(r => r.routeId === routeId);
+
+        if (!currentRoute) {
+          throw new Error('Route not found');
+        }
+
+        // Display route info
+        document.getElementById('routeInfo').innerHTML = `
+          <h3>${currentRoute.name || currentRoute.routeId}</h3>
+          <p><strong>Route ID:</strong> ${currentRoute.routeId}</p>
+          <p><strong>Status:</strong> ${currentRoute.status}</p>
+          <p><strong>Locations:</strong> ${currentRoute.bins?.length || 0}</p>
+        `;
+
+        loading.style.display = 'none';
+        content.style.display = 'block';
+      } catch (error) {
+        showMessage('error', error.message);
+        loading.style.display = 'none';
+      }
+    }
+
+    // Handle photo selection
+    document.getElementById('photoInput').addEventListener('change', function(e) {
+      const files = Array.from(e.target.files);
+      
+      files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            selectedPhotos.push(event.target.result);
+            updatePhotoPreview();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    });
+
+    function updatePhotoPreview() {
+      const preview = document.getElementById('photoPreview');
+      preview.innerHTML = selectedPhotos.map((photo, index) => `
+        <div class="photo-item">
+          <img src="${photo}" alt="Photo ${index + 1}">
+          <button class="remove-btn" onclick="removePhoto(${index})">×</button>
+        </div>
+      `).join('');
+
+      // Enable/disable submit button
+      document.getElementById('submitBtn').disabled = selectedPhotos.length === 0;
+    }
+
+    function removePhoto(index) {
+      selectedPhotos.splice(index, 1);
+      updatePhotoPreview();
+    }
+
+    async function submitCompletion() {
+      if (selectedPhotos.length === 0) {
+        showMessage('error', 'Please upload at least one photo');
+        return;
+      }
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      try {
+        const token = localStorage.getItem('token');
+        const notes = document.getElementById('notes').value;
+
+        const response = await fetch(`${API_URL}/route-completion/${routeId}/complete`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            photos: selectedPhotos,
+            notes: notes
+          })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to submit completion');
+        }
+
+        showMessage('success', '✅ Route marked as complete! Redirecting...');
+        setTimeout(() => window.location.href = '/mobile', 2000);
+      } catch (error) {
+        showMessage('error', error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✅ Mark as Complete';
+      }
+    }
+
+    function showMessage(type, text) {
+      const message = document.getElementById('message');
+      message.className = `message ${type}`;
+      message.textContent = text;
+      message.style.display = 'block';
+      
+      if (type === 'success') {
+        setTimeout(() => message.style.display = 'none', 5000);
+      }
+    }
+
+    // Load route on page load
+    loadRouteDetails();
+  </script>
+</body>
+</html>
