@@ -373,6 +373,29 @@
       updatePhotoPreview();
     }
 
+    async function uploadToCloudinary(base64Image) {
+      const cloudName = 'ds2jhfjti';
+      const uploadPreset = 'kolek-ta-uploads'; // We'll create this
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', base64Image);
+        formData.append('upload_preset', uploadPreset);
+        formData.append('folder', 'route-completions');
+        
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        const data = await response.json();
+        return data.secure_url;
+      } catch (error) {
+        console.error('Cloudinary upload error:', error);
+        return null;
+      }
+    }
+
     async function submitCompletion() {
       if (selectedPhotos.length === 0) {
         showMessage('error', 'Please upload at least one photo');
@@ -381,17 +404,28 @@
 
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
+      submitBtn.textContent = 'Uploading photos...';
 
       try {
         const token = localStorage.getItem('token');
         const notes = document.getElementById('notes').value;
 
-        console.log('Submitting completion for route:', routeId);
-        console.log('Photos count:', selectedPhotos.length);
+        console.log('Uploading', selectedPhotos.length, 'photos to Cloudinary...');
+        
+        // Upload photos to Cloudinary
+        const uploadPromises = selectedPhotos.map(photo => uploadToCloudinary(photo));
+        const photoUrls = await Promise.all(uploadPromises);
+        
+        // Filter out failed uploads
+        const successfulUploads = photoUrls.filter(url => url !== null);
+        
+        if (successfulUploads.length === 0) {
+          throw new Error('Failed to upload photos. Please try again.');
+        }
 
-        // For now, just send photo count instead of actual photos to avoid timeout
-        // TODO: Implement proper cloud storage (Cloudinary) for photos
+        console.log('Uploaded', successfulUploads.length, 'photos successfully');
+        submitBtn.textContent = 'Saving completion...';
+
         const response = await fetch(`${API_URL}/route-completion/${routeId}/complete`, {
           method: 'POST',
           headers: {
@@ -399,13 +433,12 @@
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            photos: [`Photo proof: ${selectedPhotos.length} photo(s) uploaded`], // Placeholder
-            notes: notes + `\n[${selectedPhotos.length} photos were uploaded but not stored - implement cloud storage]`
+            photos: successfulUploads,
+            notes: notes
           })
         });
 
         console.log('Response status:', response.status);
-        console.log('Response ok:', response.ok);
 
         // Check if response has content
         const contentType = response.headers.get('content-type');
@@ -414,7 +447,6 @@
         }
 
         const result = await response.json();
-        console.log('Response data:', result);
 
         if (!response.ok) {
           throw new Error(result.error || 'Failed to submit completion');
