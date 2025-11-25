@@ -1,9 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 const path = require('path');
 const { initialize } = require('./data/storage');
+const { connectToDatabase } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,39 +13,35 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Ensure MongoDB connection for API routes (serverless optimization)
+app.use('/api/*', async (req, res, next) => {
+  if (!useMockAuth) {
+    try {
+      await connectToDatabase();
+    } catch (error) {
+      console.error('Failed to connect to database:', error);
+      return res.status(503).json({ error: 'Database connection failed. Please try again.' });
+    }
+  }
+  next();
+});
+
 // Check if using mock authentication
 const useMockAuth = process.env.USE_MOCK_AUTH === 'true';
 
-// MongoDB Connection with Vercel-optimized settings
+// MongoDB Connection
 if (!useMockAuth) {
-  const mongoOptions = {
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-    family: 4 // Use IPv4, skip trying IPv6
-  };
-  
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/kolekta', mongoOptions)
+  // Connect to MongoDB with caching for serverless
+  connectToDatabase()
     .then(() => {
-      console.log('✅ Connected to MongoDB');
-      console.log('📊 Database:', mongoose.connection.name);
+      console.log('✅ Database connection established');
     })
     .catch(err => {
-      console.error('❌ MongoDB connection error:', err.message);
+      console.error('❌ Database connection failed:', err.message);
       console.log('💡 Tip: Set USE_MOCK_AUTH=true in .env to use mock authentication');
-      console.log('🔍 Connection string:', process.env.MONGODB_URI ? 'Found' : 'Missing');
     });
-  
-  // Handle connection events
-  mongoose.connection.on('error', err => {
-    console.error('MongoDB connection error:', err);
-  });
-  
-  mongoose.connection.on('disconnected', () => {
-    console.log('MongoDB disconnected');
-  });
 } else {
   console.log('📝 Mock authentication enabled - no database needed');
-  // Initialize persistent storage
   initialize();
   console.log('💾 Persistent storage initialized');
 }
